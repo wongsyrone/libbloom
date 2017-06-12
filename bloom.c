@@ -20,13 +20,17 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "MurmurHash3.h"
 #include "bloom.h"
-#include "murmurhash2.h"
 
 #define MAKESTRING(n) STRING(n)
 #define STRING(n) #n
 
+// x & 0x7 == x % 0x8 only for 2^n
+#define bit_set(buf, x)  ((buf)[(x) >> 3] |= (0x1 << ((x) & 0x7)))
+#define bit_get(buf, x)  ((buf)[(x) >> 3] &  (0x1 << ((x) & 0x7)))
 
+/*
 inline static int test_bit_set_bit(unsigned char * buf,
                                    unsigned int x, int set_bit)
 {
@@ -43,7 +47,7 @@ inline static int test_bit_set_bit(unsigned char * buf,
     return 0;
   }
 }
-
+*/
 
 static int bloom_check_add(struct bloom * bloom,
                            const void * buffer, int len, int add)
@@ -54,15 +58,21 @@ static int bloom_check_add(struct bloom * bloom,
   }
 
   int hits = 0;
-  register unsigned int a = murmurhash2(buffer, len, 0x9747b28c);
-  register unsigned int b = murmurhash2(buffer, len, a);
+  int ret = -1;
+  register unsigned int a;
+  register unsigned int b;
   register unsigned int x;
   register unsigned int i;
 
+  MurmurHash3_x86_32(buffer, len, 0x9747b28c, &a);
+  MurmurHash3_x86_32(buffer, len, a, &b);
+
   for (i = 0; i < bloom->hashes; i++) {
     x = (a + i*b) % bloom->bits;
-    if (test_bit_set_bit(bloom->bf, x, add)) {
-      hits++;
+    if (bit_get(bloom->bf, x)) {
+        hits++;
+    } else if (add) { // bit is not set
+        bit_set(bloom->bf, x);
     }
   }
 
