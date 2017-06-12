@@ -58,9 +58,8 @@ static int bloom_check_add(struct bloom * bloom,
   }
 
   int hits = 0;
-  int ret = -1;
-  register unsigned int a;
-  register unsigned int b;
+  unsigned int a;
+  unsigned int b;
   register unsigned int x;
   register unsigned int i;
 
